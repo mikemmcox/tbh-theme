@@ -125,14 +125,11 @@ function add_quantity_inputs_for_sizes() {
     global $product;
 
     if ( $product->is_type( 'variable' ) ) {
-        $available_variations = $product->get_available_variations();
-        $variations_json = wp_json_encode($available_variations);
-
         $size_attribute = 'pa_size'; // Adjust the attribute slug if needed
         $sizes = wc_get_product_terms( $product->get_id(), $size_attribute, array( 'fields' => 'all' ) );
 
         if ( ! empty( $sizes ) ) {
-            echo '<div id="size-quantity-fields" style="display:none; margin-top: 20px;">';
+            echo '<div id="size-quantity-fields" style="margin-top: 20px;">';
             foreach ( $sizes as $size ) {
                 $size_slug = esc_attr( $size->slug );
                 $size_name = esc_html( $size->name );
@@ -144,25 +141,19 @@ function add_quantity_inputs_for_sizes() {
             }
             echo '</div>';
         }
+    }
+}
 
-        // JavaScript for toggling visibility based on selected color
+add_action( 'wp_enqueue_scripts', 'hide_default_size_dropdown' );
+
+function hide_default_size_dropdown() {
+    if ( is_product() ) {
         ?>
-        <script type="text/javascript">
-            jQuery(document).ready(function($) {
-                let variations = <?php echo $variations_json; ?>;
-                
-                $('select#pa_colour').change(function() {
-                    let selectedColor = $(this).val();
-                    let sizeFields = $('#size-quantity-fields');
-
-                    if (selectedColor) {
-                        sizeFields.show();
-                    } else {
-                        sizeFields.hide();
-                    }
-                }).trigger('change');
-            });
-        </script>
+        <style type="text/css">
+            .variations select[name^="attribute_pa_size"] {
+                display: none !important;
+            }
+        </style>
         <?php
     }
 }
