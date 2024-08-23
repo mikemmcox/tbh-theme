@@ -118,7 +118,7 @@ function get_product_brand_logo() {
 add_shortcode('product_brand_logo', 'get_product_brand_logo');
 
 
-// Adding quantity boxes for size attribute
+
 add_action( 'woocommerce_before_add_to_cart_button', 'add_quantity_inputs_for_sizes' );
 
 function add_quantity_inputs_for_sizes() {
@@ -214,7 +214,4 @@ function add_size_quantities_to_order( $item_id, $values ) {
         }
     }
 }
-
-
-
 
