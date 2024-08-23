@@ -119,120 +119,103 @@ add_shortcode('product_brand_logo', 'get_product_brand_logo');
 
 
 
-// Remove default WooCommerce size dropdown
-add_filter('woocommerce_dropdown_variation_attribute_options_args', 'remove_default_size_dropdown', 10, 1);
-function remove_default_size_dropdown($args) {
-    // Check if this is the size attribute
-    if ($args['attribute'] === 'attribute_pa_size') {
-        $args['show_option_none'] = ''; // Remove the default options
-        $args['options'] = array(); // Clear the options
-    }
-    return $args;
-}
+add_action( 'woocommerce_before_add_to_cart_button', 'add_quantity_inputs_for_sizes' );
 
-// Add custom quantity fields
-add_action('woocommerce_before_single_variation', 'add_custom_quantity_fields', 20);
-function add_custom_quantity_fields() {
+function add_quantity_inputs_for_sizes() {
     global $product;
 
-    if ($product->is_type('variable')) {
+    if ( $product->is_type( 'variable' ) ) {
         $available_variations = $product->get_available_variations();
+        $variations_json = wp_json_encode($available_variations);
 
-        if ($available_variations) {
-            echo '<div id="custom-quantity-fields">';
+        $size_attribute = 'pa_size'; // Adjust the attribute slug if needed
+        $sizes = wc_get_product_terms( $product->get_id(), $size_attribute, array( 'fields' => 'all' ) );
 
-            // Collect sizes and prices
-            $sizes = array();
-            foreach ($available_variations as $variation) {
-                $variation_id = $variation['variation_id'];
-                $size = $variation['attributes']['attribute_pa_size']; // Ensure this matches your attribute slug
-                $price = $variation['display_price'];
+        if ( ! empty( $sizes ) ) {
+            echo '<div id="size-quantity-fields" style="display:none; margin-top: 20px;">';
+            foreach ( $sizes as $size ) {
+                $size_slug = esc_attr( $size->slug );
+                $size_name = esc_html( $size->name );
 
-                if (!isset($sizes[$size])) {
-                    $sizes[$size] = array(
-                        'id' => $variation_id,
-                        'price' => $price
-                    );
-                }
-            }
-
-            // Ensure sizes are ordered according to WooCommerce sorting
-            uasort($sizes, function($a, $b) {
-                return $a['id'] - $b['id']; // Adjust sorting as per your requirement
-            });
-
-            foreach ($sizes as $size => $data) {
-                echo '<div class="size-quantity-field">';
-                echo '<label for="quantity_' . esc_attr($size) . '">' . esc_html($size) . '</label>';
-                echo '<input type="number" id="quantity_' . esc_attr($size) . '" name="quantity_' . esc_attr($size) . '" value="0" min="0" data-size="' . esc_attr($size) . '" data-variation-id="' . esc_attr($data['id']) . '" data-price="' . esc_attr($data['price']) . '">';
+                echo '<div class="quantity-size">';
+                echo '<label for="size-' . $size_slug . '" style="margin-right: 10px;">' . $size_name . '</label>';
+                echo '<input type="number" id="size-' . $size_slug . '" name="quantity[' . $size_slug . ']" value="0" min="0" class="input-text qty text" size="4" style="width: 60px;"/>';
                 echo '</div>';
             }
-
             echo '</div>';
         }
+
+        // JavaScript for toggling visibility based on selected color
+        ?>
+        <script type="text/javascript">
+            jQuery(document).ready(function($) {
+                let variations = <?php echo $variations_json; ?>;
+                
+                $('select#pa_colour').change(function() {
+                    let selectedColor = $(this).val();
+                    let sizeFields = $('#size-quantity-fields');
+
+                    if (selectedColor) {
+                        sizeFields.show();
+                    } else {
+                        sizeFields.hide();
+                    }
+                }).trigger('change');
+            });
+        </script>
+        <?php
     }
 }
 
+add_filter( 'woocommerce_add_to_cart_validation', 'validate_size_quantities', 10, 2 );
 
-
-
-
-
-
-
-
-
-add_filter('woocommerce_add_cart_item_data', 'add_custom_quantity_to_cart_item', 10, 2);
-function add_custom_quantity_to_cart_item($cart_item_data, $product_id) {
-    if (isset($_POST['quantity'])) {
-        $cart_item_data['custom_quantities'] = $_POST['quantity'];
+function validate_size_quantities( $passed, $product_id ) {
+    if ( isset( $_POST['quantity'] ) && is_array( $_POST['quantity'] ) ) {
+        $total_quantity = array_sum( $_POST['quantity'] );
+        if ( $total_quantity <= 0 ) {
+            wc_add_notice( __( 'Please enter a quantity for at least one size.' ), 'error' );
+            return false;
+        }
     }
+
+    return $passed;
+}
+
+add_filter( 'woocommerce_add_cart_item_data', 'add_size_quantities_to_cart', 10, 2 );
+
+function add_size_quantities_to_cart( $cart_item_data, $product_id ) {
+    if ( isset( $_POST['quantity'] ) && is_array( $_POST['quantity'] ) ) {
+        $cart_item_data['size_quantities'] = $_POST['quantity'];
+    }
+
     return $cart_item_data;
 }
 
-add_filter('woocommerce_get_item_data', 'display_custom_quantities_cart', 10, 2);
-function display_custom_quantities_cart($item_data, $cart_item) {
-    if (isset($cart_item['custom_quantities'])) {
-        foreach ($cart_item['custom_quantities'] as $variation_id => $quantity) {
-            $item_data[] = array(
-                'key'     => 'Quantity for Variation ' . $variation_id,
-                'value'   => $quantity
-            );
+add_filter( 'woocommerce_get_item_data', 'display_size_quantities_in_cart', 10, 2 );
+
+function display_size_quantities_in_cart( $item_data, $cart_item ) {
+    if ( isset( $cart_item['size_quantities'] ) && is_array( $cart_item['size_quantities'] ) ) {
+        foreach ( $cart_item['size_quantities'] as $size => $quantity ) {
+            if ( $quantity > 0 ) {
+                $item_data[] = array(
+                    'name'  => wc_attribute_label( 'pa_size' ) . ' ' . wc_get_product_term_name( $cart_item['product_id'], 'pa_size', $size ),
+                    'value' => $quantity,
+                );
+            }
         }
     }
+
     return $item_data;
 }
 
-add_action('woocommerce_checkout_create_order_line_item', 'add_custom_quantities_order_meta', 10, 4);
-function add_custom_quantities_order_meta($item, $cart_item_key, $values, $order) {
-    if (isset($values['custom_quantities'])) {
-        foreach ($values['custom_quantities'] as $variation_id => $quantity) {
-            $item->add_meta_data('Quantity for Variation ' . $variation_id, $quantity);
+add_action( 'woocommerce_add_order_item_meta', 'add_size_quantities_to_order', 10, 2 );
+
+function add_size_quantities_to_order( $item_id, $values ) {
+    if ( isset( $values['size_quantities'] ) && is_array( $values['size_quantities'] ) ) {
+        foreach ( $values['size_quantities'] as $size => $quantity ) {
+            if ( $quantity > 0 ) {
+                wc_add_order_item_meta( $item_id, wc_attribute_label( 'pa_size' ) . ' ' . wc_get_product_term_name( $values['product_id'], 'pa_size', $size ), $quantity );
+            }
         }
     }
 }
-
-
-add_filter('woocommerce_email_order_meta_keys', 'add_custom_quantities_email', 10, 1);
-function add_custom_quantities_email($keys) {
-    $keys[] = 'Quantity for Variation';
-    return $keys;
-}
-
-
-function custom_enqueue_scripts() {
-    wp_enqueue_script('jquery');
-    wp_enqueue_script(
-        'custom-woocommerce', 
-        get_stylesheet_directory_uri() . '/assets/js/custom-woocommerce.js', 
-        array('jquery'), 
-        null, 
-        true // Load in footer
-    );
-}
-add_action('wp_enqueue_scripts', 'custom_enqueue_scripts');
-
-
-
-
-
