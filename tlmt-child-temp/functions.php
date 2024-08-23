@@ -144,13 +144,17 @@ function add_quantity_inputs_for_sizes() {
     }
 }
 
-add_action( 'wp_enqueue_scripts', 'hide_default_size_dropdown' );
+add_action( 'wp_enqueue_scripts', 'remove_default_size_dropdown' );
 
-function hide_default_size_dropdown() {
+function remove_default_size_dropdown() {
     if ( is_product() ) {
         ?>
         <style type="text/css">
             .variations select[name^="attribute_pa_size"] {
+                display: none !important;
+            }
+
+            .variations .label[for^="pa_size"] {
                 display: none !important;
             }
         </style>
