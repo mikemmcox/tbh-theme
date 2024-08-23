@@ -118,7 +118,7 @@ function get_product_brand_logo() {
 add_shortcode('product_brand_logo', 'get_product_brand_logo');
 
 
-
+// Adding quantity boxes for size attribute
 add_action( 'woocommerce_before_add_to_cart_button', 'add_quantity_inputs_for_sizes' );
 
 function add_quantity_inputs_for_sizes() {
@@ -213,4 +213,30 @@ function add_size_quantities_to_order( $item_id, $values ) {
             }
         }
     }
+}
+
+
+
+
+// Display size quantities in the cart and checkout pages
+add_filter( 'woocommerce_get_item_data', 'display_size_quantities_in_cart', 10, 2 );
+
+function display_size_quantities_in_cart( $item_data, $cart_item ) {
+    if ( isset( $cart_item['size_quantities'] ) && is_array( $cart_item['size_quantities'] ) ) {
+        $size_details = '';
+        foreach ( $cart_item['size_quantities'] as $size => $quantity ) {
+            if ( $quantity > 0 ) {
+                $size_name = wc_get_product_term_name( $cart_item['product_id'], 'pa_size', $size );
+                $size_details .= $size_name . ': ' . $quantity . '<br>';
+            }
+        }
+        if ( ! empty( $size_details ) ) {
+            $item_data[] = array(
+                'name'  => __( 'Sizes Ordered', 'your-textdomain' ),
+                'value' => $size_details,
+            );
+        }
+    }
+
+    return $item_data;
 }
